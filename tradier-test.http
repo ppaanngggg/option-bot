@@ -17,3 +17,28 @@ Accept: application/json
 GET {{host}}/v1/markets/options/chains?greeks=true&expiration=2024-04-19&symbol=SPY
 Authorization: {{token}}
 Accept: application/json
+
+### Get Quotes
+GET {{host}}/v1/markets/quotes?greeks=true&symbols=SPY240419C00490000
+Authorization: {{token}}
+Accept: application/json
+
+### Get an account’s orders
+GET {{host}}/v1/accounts/{{account}}/orders
+Authorization: {{token}}
+Accept: application/json
+
+### Get an account’s history
+GET {{host}}/v1/accounts/{{account}}/history
+Authorization: {{token}}
+Accept: application/json
+
+### Get the intraday status
+GET {{host}}/v1/markets/clock
+Authorization: {{token}}
+Accept: application/json
+
+### Get the market calendar
+GET {{host}}/v1/markets/calendar
+Authorization: {{token}}
+Accept: application/json
