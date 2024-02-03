@@ -74,30 +74,59 @@ func readOptionsDX() (*Chain, error) {
 		if err != nil {
 			return nil, err
 		}
-		chain.Calls = append(chain.Calls, Option{
-			StrikePrice: strikePrice,
-			BidPrice:    callBidPrice,
-			BidSize:     callBidSize,
-			AskPrice:    callAskPrice,
-			AskSize:     callAskSize,
-		})
-		chain.Puts = append(chain.Puts, Option{
-			StrikePrice: strikePrice,
-			BidPrice:    putBidPrice,
-			BidSize:     putBidSize,
-			AskPrice:    putAskPrice,
-			AskSize:     putAskSize,
-		})
+		chain.Calls = append(
+			chain.Calls, Option{
+				StrikePrice: strikePrice,
+				BidPrice:    callBidPrice,
+				BidSize:     callBidSize,
+				AskPrice:    callAskPrice,
+				AskSize:     callAskSize,
+			},
+		)
+		chain.Puts = append(
+			chain.Puts, Option{
+				StrikePrice: strikePrice,
+				BidPrice:    putBidPrice,
+				BidSize:     putBidSize,
+				AskPrice:    putAskPrice,
+				AskSize:     putAskSize,
+			},
+		)
 	}
 	return &chain, nil
 }
 
-func TestReadOptionsDX(t *testing.T) {
+func TestCustom(t *testing.T) {
 	chain, err := readOptionsDX()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(chain.Calls) != len(chain.Puts) {
-		t.Fatalf("calls and puts length mismatch: %d != %d", len(chain.Calls), len(chain.Puts))
+		t.Fatalf(
+			"calls and puts length mismatch: %d != %d", len(chain.Calls),
+			len(chain.Puts),
+		)
+	}
+	chain.SortByStrikePrice()
+	priceDistributions, err := chain.PredictPriceDistributionByCalls()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, pd := range priceDistributions {
+		t.Logf("price: %0.4f, prob: %0.4f", pd.Price, pd.Prob)
+	}
+	sum := 0.0
+	for _, pd := range priceDistributions {
+		sum += pd.Prob
+	}
+	t.Logf("sum of prob: %0.4f", sum)
+	for _, call := range chain.Calls {
+		delta := 0.0
+		for _, pd := range priceDistributions {
+			if pd.Price > call.StrikePrice {
+				delta += pd.Prob
+			}
+		}
+		t.Logf("strike: %0.4f, delta: %0.4f", call.StrikePrice, delta)
 	}
 }
