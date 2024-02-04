@@ -52,6 +52,7 @@ func (c *Chain) SortByStrikePrice() {
 }
 
 type MyConverge struct {
+	first          bool
 	lastX          []float64
 	diffThreshold  float64
 	count          int
@@ -59,8 +60,10 @@ type MyConverge struct {
 }
 
 func (m *MyConverge) Init(dim int) {
+	m.first = true
+	m.lastX = make([]float64, dim)
 	if m.diffThreshold == 0 {
-		m.diffThreshold = 1e-5
+		m.diffThreshold = 1e-3
 	}
 	if m.countThreshold == 0 {
 		m.countThreshold = 10
@@ -68,6 +71,11 @@ func (m *MyConverge) Init(dim int) {
 }
 
 func (m *MyConverge) Converged(loc *optimize.Location) optimize.Status {
+	if m.first {
+		m.first = false
+		copy(m.lastX, loc.X)
+		return optimize.NotTerminated
+	}
 	maxDiff := 0.0
 	for i, x := range loc.X {
 		diff := math.Abs(x - m.lastX[i])
@@ -75,7 +83,7 @@ func (m *MyConverge) Converged(loc *optimize.Location) optimize.Status {
 			maxDiff = diff
 		}
 	}
-	m.lastX = loc.X
+	copy(m.lastX, loc.X)
 	if maxDiff < m.diffThreshold {
 		m.count++
 	} else {
@@ -140,7 +148,7 @@ func (c *Chain) PredictPriceDistributionByCalls() ([]PriceDistribution, error) {
 		},
 	}
 	result, err := optimize.Minimize(
-		p, probs, &optimize.Settings{Converger: &MyConverge{lastX: probs}}, nil,
+		p, probs, &optimize.Settings{Converger: &MyConverge{}}, nil,
 	)
 	if err != nil {
 		return nil, err

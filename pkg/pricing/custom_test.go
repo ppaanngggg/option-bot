@@ -2,6 +2,7 @@ package pricing
 
 import (
 	"encoding/csv"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -113,13 +114,8 @@ func TestCustom(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, pd := range priceDistributions {
-		t.Logf("price: %0.4f, prob: %0.4f", pd.Price, pd.Prob)
+		fmt.Printf("price: %0.4f, prob: %0.4f\n", pd.Price, pd.Prob)
 	}
-	sum := 0.0
-	for _, pd := range priceDistributions {
-		sum += pd.Prob
-	}
-	t.Logf("sum of prob: %0.4f", sum)
 	for _, call := range chain.Calls {
 		delta := 0.0
 		for _, pd := range priceDistributions {
@@ -127,6 +123,6 @@ func TestCustom(t *testing.T) {
 				delta += pd.Prob
 			}
 		}
-		t.Logf("strike: %0.4f, delta: %0.4f", call.StrikePrice, delta)
+		fmt.Printf("strike: %0.4f, delta: %0.4f\n", call.StrikePrice, delta)
 	}
 }
