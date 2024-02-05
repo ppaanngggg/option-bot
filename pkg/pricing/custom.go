@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"gonum.org/v1/gonum/diff/fd"
+	"gonum.org/v1/gonum/mat"
 	"gonum.org/v1/gonum/optimize"
 )
 
@@ -63,10 +64,10 @@ func (m *MyConverge) Init(dim int) {
 	m.first = true
 	m.lastX = make([]float64, dim)
 	if m.diffThreshold == 0 {
-		m.diffThreshold = 1e-3
+		m.diffThreshold = 1e-4
 	}
 	if m.countThreshold == 0 {
-		m.countThreshold = 10
+		m.countThreshold = 1
 	}
 }
 
@@ -113,31 +114,50 @@ func (c *Chain) PredictPriceDistributionByCalls() ([]PriceDistribution, error) {
 		prices = append(prices, price)
 		probs = append(probs, 0.0)
 	}
+	// build matrix A and vector b
+	A := make([]float64, 0, len(c.Calls)*len(prices))
+	b := make([]float64, 0, len(c.Calls))
+	for _, call := range c.Calls {
+		var optionPrice float64
+		if call.BidSize == 0 && call.AskSize == 0 {
+			continue
+		}
+		if call.BidPrice > 0 && call.AskPrice > 0 {
+			optionPrice = (call.BidPrice + call.AskPrice) / 2.0
+		}
+		if call.BidPrice > 0 && call.AskPrice == 0 {
+			optionPrice = call.BidPrice
+		}
+		if call.BidPrice == 0 && call.AskPrice > 0 {
+			optionPrice = call.AskPrice
+		}
+		b = append(b, optionPrice)
+		for _, price := range prices {
+			if price > call.StrikePrice {
+				A = append(A, price-call.StrikePrice)
+			} else {
+				A = append(A, 0.0)
+			}
+		}
+	}
+	// create matrix A and vector b
+	Amat := mat.NewDense(len(A)/len(prices), len(prices), A)
+	bmat := mat.NewDense(len(b), 1, b)
+
 	// calculate loss func
 	lossFunc := func(x []float64) float64 {
-		loss := 0.0
-		for _, call := range c.Calls {
-			var optionPrice, shouldPrice float64
-			if call.BidSize == 0 && call.AskSize == 0 {
-				continue
-			}
-			if call.BidPrice > 0 && call.AskPrice > 0 {
-				optionPrice = (call.BidPrice + call.AskPrice) / 2.0
-			}
-			if call.BidPrice > 0 && call.AskPrice == 0 {
-				optionPrice = call.BidPrice
-			}
-			if call.BidPrice == 0 && call.AskPrice > 0 {
-				optionPrice = call.AskPrice
-			}
-			for i, price := range prices {
-				prob := math.Pow(x[i], 2)
-				if price > call.StrikePrice {
-					shouldPrice += prob * (price - call.StrikePrice)
-				}
-			}
-			loss += math.Pow(optionPrice-shouldPrice, 2)
-		}
+		xmat := mat.NewDense(len(prices), 1, x)
+		// pow 2
+		xmat.MulElem(xmat, xmat)
+		// multiply A and x
+		var tmp mat.Dense
+		tmp.Mul(Amat, xmat)
+		// subtract b
+		tmp.Sub(&tmp, bmat)
+		// pow 2
+		tmp.MulElem(&tmp, &tmp)
+		// sum
+		loss := mat.Sum(&tmp)
 		return loss
 	}
 	// minimize loss func
