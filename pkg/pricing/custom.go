@@ -52,52 +52,7 @@ func (c *Chain) SortByStrikePrice() {
 	)
 }
 
-type MyConverge struct {
-	first          bool
-	lastX          []float64
-	diffThreshold  float64
-	count          int
-	countThreshold int
-}
-
-func (m *MyConverge) Init(dim int) {
-	m.first = true
-	m.lastX = make([]float64, dim)
-	if m.diffThreshold == 0 {
-		m.diffThreshold = 1e-4
-	}
-	if m.countThreshold == 0 {
-		m.countThreshold = 1
-	}
-}
-
-func (m *MyConverge) Converged(loc *optimize.Location) optimize.Status {
-	if m.first {
-		m.first = false
-		copy(m.lastX, loc.X)
-		return optimize.NotTerminated
-	}
-	maxDiff := 0.0
-	for i, x := range loc.X {
-		diff := math.Abs(x - m.lastX[i])
-		if diff > maxDiff {
-			maxDiff = diff
-		}
-	}
-	copy(m.lastX, loc.X)
-	if maxDiff < m.diffThreshold {
-		m.count++
-	} else {
-		m.count = 0
-	}
-	if m.count > m.countThreshold {
-		return optimize.FunctionConvergence
-	}
-	return optimize.NotTerminated
-}
-
-func (c *Chain) PredictPriceDistributionByCalls() ([]PriceDistribution, error) {
-	// find minimum strike diff of calls
+func (c *Chain) findMinStrikeDiff() float64 {
 	minStrikeDiff := math.MaxFloat64
 	for i := 1; i < len(c.Calls); i++ {
 		strikeDiff := c.Calls[i].StrikePrice - c.Calls[i-1].StrikePrice
@@ -105,48 +60,60 @@ func (c *Chain) PredictPriceDistributionByCalls() ([]PriceDistribution, error) {
 			minStrikeDiff = strikeDiff
 		}
 	}
-	// create init price distribution
-	price := c.Calls[0].StrikePrice - minStrikeDiff/2.0
+	for i := 1; i < len(c.Puts); i++ {
+		strikeDiff := c.Puts[i].StrikePrice - c.Puts[i-1].StrikePrice
+		if strikeDiff < minStrikeDiff {
+			minStrikeDiff = strikeDiff
+		}
+	}
+	return minStrikeDiff
+}
+
+func (c *Chain) initPriceDistribution(minStrikeDiff float64) ([]float64, []float64) {
+	minStrike := math.Min(c.Calls[0].StrikePrice, c.Puts[0].StrikePrice)
+	maxStrike := math.Max(
+		c.Calls[len(c.Calls)-1].StrikePrice, c.Puts[len(c.Puts)-1].StrikePrice,
+	)
+	price := minStrike - minStrikeDiff/2.0
 	prices := make([]float64, 0)
 	probs := make([]float64, 0)
-	for range c.Calls {
+	prices = append(prices, price)
+	probs = append(probs, 0.0)
+	for price < maxStrike {
 		price += minStrikeDiff
 		prices = append(prices, price)
 		probs = append(probs, 0.0)
 	}
-	// build matrix A and vector b
-	A := make([]float64, 0, len(c.Calls)*len(prices))
-	b := make([]float64, 0, len(c.Calls))
-	for _, call := range c.Calls {
-		var optionPrice float64
-		if call.BidSize == 0 && call.AskSize == 0 {
-			continue
-		}
-		if call.BidPrice > 0 && call.AskPrice > 0 {
-			optionPrice = (call.BidPrice + call.AskPrice) / 2.0
-		}
-		if call.BidPrice > 0 && call.AskPrice == 0 {
-			optionPrice = call.BidPrice
-		}
-		if call.BidPrice == 0 && call.AskPrice > 0 {
-			optionPrice = call.AskPrice
-		}
-		b = append(b, optionPrice)
-		for _, price := range prices {
-			if price > call.StrikePrice {
-				A = append(A, price-call.StrikePrice)
-			} else {
-				A = append(A, 0.0)
-			}
-		}
+	return prices, probs
+}
+
+func getRealPrice(option Option) float64 {
+	var price float64
+	if option.BidSize == 0 && option.AskSize == 0 {
+		return 0
 	}
+	if option.BidPrice > 0 && option.AskPrice > 0 {
+		price = (option.BidPrice + option.AskPrice) / 2.0
+	}
+	if option.BidPrice > 0 && option.AskPrice == 0 {
+		price = option.BidPrice
+	}
+	if option.BidPrice == 0 && option.AskPrice > 0 {
+		price = option.AskPrice
+	}
+	return price
+}
+
+func solvePriceDistribution(
+	prices []float64, probs []float64, A []float64, b []float64, w []float64,
+) ([]PriceDistribution, error) {
 	// create matrix A and vector b
 	Amat := mat.NewDense(len(A)/len(prices), len(prices), A)
 	bmat := mat.NewDense(len(b), 1, b)
-
+	wmat := mat.NewDense(len(w), 1, w)
 	// calculate loss func
 	lossFunc := func(x []float64) float64 {
-		xmat := mat.NewDense(len(prices), 1, x)
+		xmat := mat.NewDense(len(x), 1, x)
 		// pow 2
 		xmat.MulElem(xmat, xmat)
 		// multiply A and x
@@ -156,19 +123,23 @@ func (c *Chain) PredictPriceDistributionByCalls() ([]PriceDistribution, error) {
 		tmp.Sub(&tmp, bmat)
 		// pow 2
 		tmp.MulElem(&tmp, &tmp)
+		// multiply w
+		tmp.MulElem(&tmp, wmat)
 		// sum
 		loss := mat.Sum(&tmp)
 		return loss
 	}
+	gradFunc := func(grad, x []float64) {
+		// TODO: speed up
+		fd.Gradient(grad, lossFunc, x, nil)
+	}
 	// minimize loss func
 	p := optimize.Problem{
 		Func: lossFunc,
-		Grad: func(grad, x []float64) {
-			fd.Gradient(grad, lossFunc, x, nil)
-		},
+		Grad: gradFunc,
 	}
 	result, err := optimize.Minimize(
-		p, probs, &optimize.Settings{Converger: &MyConverge{}}, nil,
+		p, probs, &optimize.Settings{Converger: &MyConverge{}}, &optimize.LBFGS{},
 	)
 	if err != nil {
 		return nil, err
@@ -190,4 +161,43 @@ func (c *Chain) PredictPriceDistributionByCalls() ([]PriceDistribution, error) {
 		)
 	}
 	return priceDistributions, nil
+}
+
+func (c *Chain) PredictPriceDistribution() ([]PriceDistribution, error) {
+	prices, probs := c.initPriceDistribution(c.findMinStrikeDiff())
+	// build matrix A and vector b
+	A := make([]float64, 0)
+	b := make([]float64, 0)
+	w := make([]float64, 0)
+	for _, call := range c.Calls {
+		realPrice := getRealPrice(call)
+		if realPrice == 0 {
+			continue
+		}
+		b = append(b, realPrice)
+		w = append(w, float64(call.BidSize+call.AskSize))
+		for _, price := range prices {
+			if price > call.StrikePrice {
+				A = append(A, price-call.StrikePrice)
+			} else {
+				A = append(A, 0.0)
+			}
+		}
+	}
+	for _, put := range c.Puts {
+		realPrice := getRealPrice(put)
+		if realPrice == 0 {
+			continue
+		}
+		b = append(b, realPrice)
+		w = append(w, float64(put.BidSize+put.AskSize))
+		for _, price := range prices {
+			if price < put.StrikePrice {
+				A = append(A, put.StrikePrice-price)
+			} else {
+				A = append(A, 0.0)
+			}
+		}
+	}
+	return solvePriceDistribution(prices, probs, A, b, w)
 }

@@ -109,20 +109,31 @@ func TestCustom(t *testing.T) {
 		)
 	}
 	chain.SortByStrikePrice()
-	priceDistributions, err := chain.PredictPriceDistributionByCalls()
+	priceDistributions, err := chain.PredictPriceDistribution()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, pd := range priceDistributions {
 		fmt.Printf("price: %0.4f, prob: %0.4f\n", pd.Price, pd.Prob)
 	}
-	for _, call := range chain.Calls {
-		delta := 0.0
+	for i := range chain.Calls {
+		call := chain.Calls[i]
+		callDelta := 0.0
 		for _, pd := range priceDistributions {
 			if pd.Price > call.StrikePrice {
-				delta += pd.Prob
+				callDelta += pd.Prob
 			}
 		}
-		fmt.Printf("strike: %0.4f, delta: %0.4f\n", call.StrikePrice, delta)
+		put := chain.Puts[i]
+		putDelta := 0.0
+		for _, pd := range priceDistributions {
+			if pd.Price < put.StrikePrice {
+				putDelta += pd.Prob
+			}
+		}
+		fmt.Printf(
+			"strike: %0.4f, callDelta: %0.4f, putDelta: %0.4f\n",
+			call.StrikePrice, callDelta, putDelta,
+		)
 	}
 }
