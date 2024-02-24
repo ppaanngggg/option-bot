@@ -4,13 +4,14 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"github.com/ppaanngggg/option-bot/pkg/market"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 )
 
-func readOptionsDX() (*Chain, error) {
+func readOptionsDX() (*market.Chain, error) {
 	file, err := os.Open("./test_data.csv")
 	if err != nil {
 		return nil, err
@@ -25,10 +26,8 @@ func readOptionsDX() (*Chain, error) {
 	if err != nil {
 		return nil, err
 	}
-	chain := Chain{
-		Symbol:         "SPY",
-		QuoteUnixTime:  1701464400,
-		ExpireUnixTime: 1701723600,
+	chain := &market.Chain{
+		Symbol: "SPY",
 	}
 	for _, record := range records {
 		callSize := record[16]
@@ -77,7 +76,7 @@ func readOptionsDX() (*Chain, error) {
 			return nil, err
 		}
 		chain.Calls = append(
-			chain.Calls, Option{
+			chain.Calls, market.Option{
 				StrikePrice: strikePrice,
 				BidPrice:    callBidPrice,
 				BidSize:     callBidSize,
@@ -86,7 +85,7 @@ func readOptionsDX() (*Chain, error) {
 			},
 		)
 		chain.Puts = append(
-			chain.Puts, Option{
+			chain.Puts, market.Option{
 				StrikePrice: strikePrice,
 				BidPrice:    putBidPrice,
 				BidSize:     putBidSize,
@@ -95,7 +94,7 @@ func readOptionsDX() (*Chain, error) {
 			},
 		)
 	}
-	return &chain, nil
+	return chain, nil
 }
 
 func TestCustomOptionsDX(t *testing.T) {
@@ -110,7 +109,7 @@ func TestCustomOptionsDX(t *testing.T) {
 		)
 	}
 	chain.SortByStrikePrice()
-	priceDistributions, err := chain.PredictPriceDistribution()
+	priceDistributions, err := PredictPriceDistribution(chain)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,8 +151,8 @@ type tradierOptions struct {
 	} `json:"options"`
 }
 
-func readTradier() (*Chain, error) {
-	chain := Chain{
+func readTradier() (*market.Chain, error) {
+	chain := &market.Chain{
 		Symbol: "SPY",
 	}
 	file, err := os.Open("./test_data.json")
@@ -171,7 +170,7 @@ func readTradier() (*Chain, error) {
 		switch option.OptionType {
 		case "call":
 			chain.Calls = append(
-				chain.Calls, Option{
+				chain.Calls, market.Option{
 					StrikePrice: option.Strike,
 					BidPrice:    option.Bid,
 					BidSize:     option.BidSize,
@@ -181,7 +180,7 @@ func readTradier() (*Chain, error) {
 			)
 		case "put":
 			chain.Puts = append(
-				chain.Puts, Option{
+				chain.Puts, market.Option{
 					StrikePrice: option.Strike,
 					BidPrice:    option.Bid,
 					BidSize:     option.BidSize,
@@ -191,7 +190,7 @@ func readTradier() (*Chain, error) {
 			)
 		}
 	}
-	return &chain, nil
+	return chain, nil
 }
 
 func TestCustomTradier(t *testing.T) {
@@ -206,7 +205,7 @@ func TestCustomTradier(t *testing.T) {
 		)
 	}
 	chain.SortByStrikePrice()
-	priceDistributions, err := chain.PredictPriceDistribution()
+	priceDistributions, err := PredictPriceDistribution(chain)
 	if err != nil {
 		t.Fatal(err)
 	}

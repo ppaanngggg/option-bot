@@ -2,57 +2,19 @@ package pricing
 
 import (
 	"fmt"
-	"math"
-	"sort"
-
+	"github.com/ppaanngggg/option-bot/pkg/market"
 	"gonum.org/v1/gonum/diff/fd"
 	"gonum.org/v1/gonum/mat"
 	"gonum.org/v1/gonum/optimize"
+	"math"
 )
-
-type Option struct {
-	StrikePrice float64
-	BidPrice    float64
-	BidSize     int
-	AskPrice    float64
-	AskSize     int
-
-	IV    float64
-	Delta float64
-	Gamma float64
-	Vega  float64
-	Theta float64
-}
-
-type Chain struct {
-	Symbol         string
-	QuoteUnixTime  int // in seconds
-	ExpireUnixTime int // in seconds
-	IV             float64
-	Calls          []Option
-	Puts           []Option
-}
 
 type PriceDistribution struct {
 	Price float64
 	Prob  float64
 }
 
-func (c *Chain) SortByStrikePrice() {
-	// sort calls and puts by strike price
-	sort.Slice(
-		c.Calls, func(i, j int) bool {
-			return c.Calls[i].StrikePrice < c.Calls[j].StrikePrice
-		},
-	)
-	sort.Slice(
-		c.Puts, func(i, j int) bool {
-			return c.Puts[i].StrikePrice < c.Puts[j].StrikePrice
-		},
-	)
-}
-
-func (c *Chain) findMinStrikeDiff() float64 {
+func findMinStrikeDiff(c *market.Chain) float64 {
 	minStrikeDiff := math.MaxFloat64
 	for i := 1; i < len(c.Calls); i++ {
 		strikeDiff := c.Calls[i].StrikePrice - c.Calls[i-1].StrikePrice
@@ -69,7 +31,7 @@ func (c *Chain) findMinStrikeDiff() float64 {
 	return minStrikeDiff
 }
 
-func (c *Chain) initPriceDistribution(minStrikeDiff float64) ([]float64, []float64) {
+func initPriceDistribution(c *market.Chain, minStrikeDiff float64) ([]float64, []float64) {
 	minStrike := math.Min(c.Calls[0].StrikePrice, c.Puts[0].StrikePrice)
 	maxStrike := math.Max(
 		c.Calls[len(c.Calls)-1].StrikePrice, c.Puts[len(c.Puts)-1].StrikePrice,
@@ -87,7 +49,7 @@ func (c *Chain) initPriceDistribution(minStrikeDiff float64) ([]float64, []float
 	return prices, probs
 }
 
-func getRealPrice(option Option) float64 {
+func getRealPrice(option market.Option) float64 {
 	var price float64
 	if option.BidSize == 0 && option.AskSize == 0 {
 		return 0
@@ -163,8 +125,8 @@ func solvePriceDistribution(
 	return priceDistributions, nil
 }
 
-func (c *Chain) PredictPriceDistribution() ([]PriceDistribution, error) {
-	prices, probs := c.initPriceDistribution(c.findMinStrikeDiff())
+func PredictPriceDistribution(c *market.Chain) ([]PriceDistribution, error) {
+	prices, probs := initPriceDistribution(c, findMinStrikeDiff(c))
 	// build matrix A and vector b
 	A := make([]float64, 0)
 	b := make([]float64, 0)
