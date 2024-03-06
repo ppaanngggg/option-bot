@@ -2,6 +2,7 @@ package ibkr
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -12,7 +13,5 @@ func newIBKR() *IBKR {
 func TestIBKR_Login(t *testing.T) {
 	ibkr := newIBKR()
 	err := ibkr.Login(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 }

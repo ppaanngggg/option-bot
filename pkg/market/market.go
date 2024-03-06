@@ -1,13 +1,14 @@
 package market
 
 import (
+	"context"
 	"sort"
 	"time"
 )
 
 type Market interface {
-	GetOptionChains(symbol string, expiration time.Time) *Option
-	GetOptionExpirations(symbol string) []time.Time
+	GetOptionChains(ctx context.Context, symbol string, expiration string) (*Option, error)
+	GetOptionExpirations(ctx context.Context, symbol string) ([]string, error)
 }
 
 type Chain struct {
