@@ -1,27 +1,39 @@
 package ibkr
 
 import (
+	"cdr.dev/slog"
 	"context"
 	"github.com/go-resty/resty/v2"
 	"github.com/ppaanngggg/option-bot/pkg/utils"
+	"golang.org/x/xerrors"
 )
 
 type IBKR struct {
 	host   string
 	client *resty.Client
+	logger slog.Logger
 }
 
 func NewIBKR(host string) *IBKR {
-	ibkr := &IBKR{host: host, client: resty.New()}
+	ibkr := &IBKR{
+		host:   host,
+		client: resty.New(),
+		logger: utils.DefaultLogger.With(slog.F("broker", "ibkr")),
+	}
 	ibkr.client.SetBaseURL(ibkr.host)
 	return ibkr
 }
 
-func (b *IBKR) Login(ctx context.Context) error {
-	resp, err := b.client.R().SetContext(ctx).Post("/v1/api/login")
+// Login Please refer to https://github.com/ppaanngggg/ib-cp-server
+func (i *IBKR) Login(ctx context.Context) error {
+	resp, err := i.client.R().SetContext(ctx).Post("/v1/api/login")
 	if err != nil {
-		return err
+		return xerrors.New(err.Error())
 	}
-	utils.DefaultLogger.Info(ctx, "ibkr login resp", "status", resp.Status())
+	if resp.IsError() {
+		return xerrors.Errorf(
+			"failed to login, status: %s, body: %s", resp.Status(), resp.String(),
+		)
+	}
 	return nil
 }
