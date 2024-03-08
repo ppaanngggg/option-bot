@@ -4,9 +4,10 @@ go 1.21.6
 
 require (
 	cdr.dev/slog v1.6.1
+	github.com/Azure/go-asynctask v1.7.0
 	github.com/go-resty/resty/v2 v2.11.0
 	github.com/jasonmerecki/gopriceoptions v0.0.0-20201025232819-6db8d0e2e493
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 )
 
