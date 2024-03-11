@@ -84,12 +84,9 @@ type Setting struct {
 	Exit       Exit       `json:"exit"`
 }
 
-type Position struct{}
-
 type Bot struct {
-	Name            string     `json:"name"`
-	Setting         Setting    `json:"setting"`
-	EnableAutoOpen  bool       `json:"enable_auto_open"`
-	EnableAutoClose bool       `json:"enable_auto_close"`
-	Positions       []Position `json:"positions"`
+	Name            string  `json:"name"`
+	Setting         Setting `json:"setting"`
+	EnableAutoOpen  bool    `json:"enable_auto_open"`
+	EnableAutoClose bool    `json:"enable_auto_close"`
 }
