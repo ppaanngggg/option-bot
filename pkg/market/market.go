@@ -6,8 +6,12 @@ import (
 )
 
 type Market interface {
-	GetOptionChains(ctx context.Context, symbol string, expiration string) ([]Chain, error)
+	// GetOptionExpirations returns a list of expiration dates for the given symbol, e.g. "SPY"
+	// return as an asc list of strings in the format "YYYY-MM-DD", e.g. ["2021-01-15", "2021-02-19", ...]
 	GetOptionExpirations(ctx context.Context, symbol string) ([]string, error)
+	// GetOptionChains returns a list of option chains for the given symbol and expiration date
+	// Because some symbols have multiple option chains, for example, SPX may return one for SPXW and one for SPY
+	GetOptionChains(ctx context.Context, symbol string, expiration string) ([]Chain, error)
 }
 
 type Chain struct {

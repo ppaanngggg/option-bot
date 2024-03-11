@@ -91,8 +91,7 @@ func (t *Tradier) GetOptionChains(
 	if err = json.Unmarshal(resp.Body(), body); err != nil {
 		return nil, xerrors.New(err.Error())
 	}
-	// the datetime format is in EST
-	timeLocation, err := time.LoadLocation("EST")
+	// the datetime format is in New York time
 	if err != nil {
 		return nil, xerrors.New(err.Error())
 	}
@@ -124,7 +123,7 @@ func (t *Tradier) GetOptionChains(
 		}
 		// parse greeks updated at to unix milli
 		greeksUpdateAt, err := time.ParseInLocation(
-			"2006-01-02 15:04:05", opt.Greeks.UpdatedAt, timeLocation,
+			"2006-01-02 15:04:05", opt.Greeks.UpdatedAt, utils.TZNewYork,
 		)
 		if err != nil {
 			return nil, xerrors.New(err.Error())
