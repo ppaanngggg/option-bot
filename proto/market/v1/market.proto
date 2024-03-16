@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package market.v1;
+
+option go_package = "github.com/ppaanngggg/option-bot/proto/gen/market/v1;marketv1";
+
+message Option {
+  string symbol = 1;
+  double strike = 2;
+  double bid = 3;
+  int32 bid_size = 4;
+  int64 bid_at = 5; // unix timestamp in ms
+  double ask = 6;
+  int32 ask_size = 7;
+  int64 ask_at = 8; // unix timestamp in ms
+  int64 quote_at = 9; // unix timestamp in ms
+
+  int64 greeks_updated_at = 10; // unix timestamp in ms
+  double iv = 11;
+  double delta = 12;
+  double gamma = 13;
+  double vega = 14;
+  double theta = 15;
+}
+
+message Chain {
+  string root_symbol = 1;
+  string underlying = 2;
+  string expiration = 3; // yyyy-mm-dd
+  repeated Option calls = 4;
+  repeated Option puts = 5;
+}
+
+enum SymbolType {
+  SYMBOL_TYPE_UNSPECIFIED = 0;
+  SYMBOL_TYPE_STOCK = 1;
+  SYMBOL_TYPE_OPTION = 2;
+  SYMBOL_TYPE_INDEX = 3;
+  SYMBOL_TYPE_ETF = 4;
+}
+
+message Symbol {
+  string symbol = 1;
+  string description = 2;
+  SymbolType type = 3;
+}

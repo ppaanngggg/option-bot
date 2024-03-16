@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package bot.v1;
 
-option go_package = "github.com/ppaanngggg/option-bot/gen/bot/v1;botv1";
+option go_package = "github.com/ppaanngggg/option-bot/proto/gen/bot/v1;botv1";
 
 /*
    Bot data types
@@ -165,6 +165,15 @@ message CreateResponse {
   Bot bot = 1;
 }
 
+message GetRequest {
+  string id = 1;
+}
+
+message GetResponse {
+  Bot bot = 1;
+}
+
 service BotService {
   rpc Create(CreateRequest) returns (CreateResponse) {}
+  rpc Get(GetRequest) returns (GetResponse) {}
 }

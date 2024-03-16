@@ -1,5 +1,0 @@
-syntax = "proto3";
-
-package account.v1;
-
-option go_package = "github.com/ppaanngggg/option-bot/gen/account/v1;accountv1";

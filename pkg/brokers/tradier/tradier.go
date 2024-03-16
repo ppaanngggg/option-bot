@@ -1,23 +1,17 @@
 package tradier
 
 import (
-	"cdr.dev/slog"
 	"context"
-	"encoding/json"
+	"sort"
+	"time"
+
+	"cdr.dev/slog"
 	"github.com/go-resty/resty/v2"
 	"github.com/ppaanngggg/option-bot/pkg/market"
 	"github.com/ppaanngggg/option-bot/pkg/utils"
+	marketv1 "github.com/ppaanngggg/option-bot/proto/gen/market/v1"
 	"golang.org/x/xerrors"
-	"sort"
-	"time"
 )
-
-type Tradier struct {
-	isLive bool
-	apiKey string
-	client *resty.Client
-	logger slog.Logger
-}
 
 func NewTradier(isLive bool, apiKey string) *Tradier {
 	tradier := &Tradier{
@@ -34,31 +28,97 @@ func NewTradier(isLive bool, apiKey string) *Tradier {
 	return tradier
 }
 
-// GetOptionChains refer to https://documentation.tradier.com/brokerage-api/markets/get-options-chains
-func (t *Tradier) GetOptionChains(
-	ctx context.Context, symbol string, expiration string,
-) ([]market.Chain, error) {
+var _ market.Market = (*Tradier)(nil)
+
+type Tradier struct {
+	isLive bool
+	apiKey string
+	client *resty.Client
+	logger slog.Logger
+}
+
+// Search refer to https://documentation.tradier.com/brokerage-api/markets/get-lookup
+func (t *Tradier) Search(ctx context.Context, query string) (
+	[]*marketv1.Symbol, error,
+) {
+	body := &struct {
+		Securities struct {
+			Security []struct {
+				Symbol      string `json:"symbol"`
+				Exchange    string `json:"exchange"`
+				Type        string `json:"type"`
+				Description string `json:"description"`
+			}
+		}
+	}{}
 	resp, err := t.client.R().
 		SetContext(ctx).
 		SetAuthToken(t.apiKey).
 		SetHeader("Accept", "application/json").
 		SetQueryParams(
 			map[string]string{
-				"symbol":     symbol,
-				"expiration": expiration,
-				"greeks":     "true",
+				"q": query,
 			},
-		).Get("/markets/options/chains")
+		).
+		SetResult(body).
+		Get("/markets/lookup")
 	if err != nil {
 		return nil, xerrors.New(err.Error())
 	}
 	if resp.IsError() {
 		return nil, xerrors.Errorf(
-			"failed to get option chains, status: %s, body: %s",
+			"failed to search symbols, status: %s, body: %s",
 			resp.Status(), resp.String(),
 		)
 	}
-	// Parse response body
+	// Convert to marketv1.Symbol
+	symbols := make([]*marketv1.Symbol, 0, len(body.Securities.Security))
+	for _, sec := range body.Securities.Security {
+		symbol := &marketv1.Symbol{
+			Symbol:      sec.Symbol,
+			Description: sec.Description,
+		}
+		switch sec.Type {
+		case "stock":
+			symbol.Type = marketv1.SymbolType_SYMBOL_TYPE_STOCK
+		case "option":
+			symbol.Type = marketv1.SymbolType_SYMBOL_TYPE_OPTION
+		case "index":
+			symbol.Type = marketv1.SymbolType_SYMBOL_TYPE_INDEX
+		case "etf":
+			symbol.Type = marketv1.SymbolType_SYMBOL_TYPE_ETF
+		}
+		symbols = append(symbols, symbol)
+	}
+	return symbols, nil
+}
+
+// GetTodayTradePeriod refer to https://documentation.tradier.com/brokerage-api/markets/get-calendar
+func (t *Tradier) GetTodayTradePeriod(ctx context.Context) ([]string, error) {
+	body := &struct {
+	}{}
+	resp, err := t.client.R().
+		SetContext(ctx).
+		SetAuthToken(t.apiKey).
+		SetHeader("Accept", "application/json").
+		SetResult(body).
+		Get("/markets/calendar")
+	if err != nil {
+		return nil, xerrors.New(err.Error())
+	}
+	if resp.IsError() {
+		return nil, xerrors.Errorf(
+			"failed to get today trade period, status: %s, body: %s",
+			resp.Status(), resp.String(),
+		)
+	}
+	return nil, nil
+}
+
+// GetOptionChains refer to https://documentation.tradier.com/brokerage-api/markets/get-options-chains
+func (t *Tradier) GetOptionChains(
+	ctx context.Context, symbol string, expiration string,
+) ([]*marketv1.Chain, error) {
 	body := &struct {
 		Options struct {
 			Option []struct {
@@ -88,38 +148,56 @@ func (t *Tradier) GetOptionChains(
 			} `json:"option"`
 		} `json:"options"`
 	}{}
-	if err = json.Unmarshal(resp.Body(), body); err != nil {
-		return nil, xerrors.New(err.Error())
-	}
-	// the datetime format is in New York time
+	resp, err := t.client.R().
+		SetContext(ctx).
+		SetAuthToken(t.apiKey).
+		SetHeader("Accept", "application/json").
+		SetQueryParams(
+			map[string]string{
+				"symbol":     symbol,
+				"expiration": expiration,
+				"greeks":     "true",
+			},
+		).
+		SetResult(body).
+		Get("/markets/options/chains")
 	if err != nil {
 		return nil, xerrors.New(err.Error())
 	}
-	// Group options by root_symbol
-	chains := make(map[string]market.Chain)
+	if resp.IsError() {
+		return nil, xerrors.Errorf(
+			"failed to get option chains, status: %s, body: %s",
+			resp.Status(), resp.String(),
+		)
+	}
+	// Group options to chain by root_symbol
+	chains := make(map[string]*marketv1.Chain)
 	for _, opt := range body.Options.Option {
+		// e.g. SPXW or SPX for underlying SPX
 		chain, ok := chains[opt.RootSymbol]
 		if !ok {
-			chain = market.Chain{
-				Symbol:         opt.RootSymbol,
-				ExpirationDate: opt.ExpirationDate,
+			chain = &marketv1.Chain{
+				RootSymbol: opt.RootSymbol,
+				Underlying: opt.Underlying,
+				Expiration: opt.ExpirationDate,
 			}
 		}
 		// Append option to chain
-		option := market.Option{
-			StrikePrice: opt.Strike,
-			BidPrice:    opt.Bid,
-			BidSize:     opt.BidSize,
-			BidAt:       opt.BidDate,
-			AskPrice:    opt.Ask,
-			AskSize:     opt.AskSize,
-			AskAt:       opt.AskDate,
-			QuoteAt:     time.Now().UnixMilli(),
-			IV:          opt.Greeks.BidIV,
-			Delta:       opt.Greeks.Delta,
-			Gamma:       opt.Greeks.Gamma,
-			Vega:        opt.Greeks.Vega,
-			Theta:       opt.Greeks.Theta,
+		option := &marketv1.Option{
+			Symbol:  opt.Symbol,
+			Strike:  opt.Strike,
+			Bid:     opt.Bid,
+			BidSize: int32(opt.BidSize),
+			BidAt:   opt.BidDate,
+			Ask:     opt.Ask,
+			AskSize: int32(opt.AskSize),
+			AskAt:   opt.AskDate,
+			QuoteAt: time.Now().UnixMilli(),
+			Iv:      opt.Greeks.BidIV,
+			Delta:   opt.Greeks.Delta,
+			Gamma:   opt.Greeks.Gamma,
+			Vega:    opt.Greeks.Vega,
+			Theta:   opt.Greeks.Theta,
 		}
 		// parse greeks updated at to unix milli
 		greeksUpdateAt, err := time.ParseInLocation(
@@ -137,9 +215,9 @@ func (t *Tradier) GetOptionChains(
 		chains[opt.RootSymbol] = chain
 	}
 	// Sort calls and puts by strike price, and return
-	rets := make([]market.Chain, 0, len(chains))
+	rets := make([]*marketv1.Chain, 0, len(chains))
 	for _, chain := range chains {
-		chain.SortByStrikePrice()
+		market.SortByStrikePrice(chain)
 		rets = append(rets, chain)
 	}
 	return rets, nil
@@ -149,6 +227,11 @@ func (t *Tradier) GetOptionChains(
 func (t *Tradier) GetOptionExpirations(
 	ctx context.Context, symbol string,
 ) ([]string, error) {
+	body := &struct {
+		Expirations struct {
+			Date []string `json:"date"`
+		} `json:"expirations"`
+	}{}
 	resp, err := t.client.R().
 		SetContext(ctx).
 		SetAuthToken(t.apiKey).
@@ -159,6 +242,7 @@ func (t *Tradier) GetOptionExpirations(
 				"includeAllRoots": "true", // to deal with VIX/VIXW, SPX/SPXW, NDX/NDXP, RUT/RUTW
 			},
 		).
+		SetResult(body).
 		Get("/markets/options/expirations")
 	if err != nil {
 		return nil, xerrors.New(err.Error())
@@ -168,15 +252,6 @@ func (t *Tradier) GetOptionExpirations(
 			"failed to get option expirations, status: %s, body: %s",
 			resp.Status(), resp.String(),
 		)
-	}
-	// Parse response body
-	body := &struct {
-		Expirations struct {
-			Date []string `json:"date"`
-		} `json:"expirations"`
-	}{}
-	if err = json.Unmarshal(resp.Body(), body); err != nil {
-		return nil, xerrors.New(err.Error())
 	}
 	// sort expirations by date
 	sort.Strings(body.Expirations.Date)

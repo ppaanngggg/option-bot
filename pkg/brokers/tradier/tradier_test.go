@@ -2,9 +2,10 @@ package tradier
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func newTradier() *Tradier {
@@ -13,14 +14,32 @@ func newTradier() *Tradier {
 
 func TestTradier_Market(t *testing.T) {
 	tradier := newTradier()
-	exps, err := tradier.GetOptionExpirations(context.Background(), "SPX")
+	ctx := context.Background()
+
+	symbols, err := tradier.Search(ctx, "SPX")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, symbols)
+	t.Logf("number of symbols: %d", len(symbols))
+	t.Logf("first symbol: %s", symbols[0].Symbol)
+
+	exps, err := tradier.GetOptionExpirations(ctx, "SPX")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, exps)
-	for _, exp := range exps {
-		println("SPX", exp)
-	}
+	t.Logf("number of expirations: %d", len(exps))
+	t.Logf("first expiration: %s", exps[0])
 
-	chains, err := tradier.GetOptionChains(context.Background(), "SPX", exps[0])
+	chains, err := tradier.GetOptionChains(ctx, "SPX", exps[0])
 	assert.NoError(t, err)
 	assert.NotEmpty(t, chains)
+	assert.Equal(t, "SPX", chains[0].Underlying)
+	assert.Equal(t, exps[0], chains[0].Expiration)
+	t.Logf("number of chains: %d", len(chains))
+	t.Logf(
+		"first chain root symbol: %s, underlying: %s, expiration: %s",
+		chains[0].RootSymbol, chains[0].Underlying, chains[0].Expiration,
+	)
+	t.Logf(
+		"first call option symbol: %s, put option symbol: %s",
+		chains[0].Calls[0].Symbol, chains[0].Puts[0].Symbol,
+	)
 }
