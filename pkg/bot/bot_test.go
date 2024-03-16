@@ -1,33 +1,25 @@
 package bot
 
 import (
-	"context"
-	"github.com/Azure/go-asynctask"
 	"testing"
-	"time"
 )
 
-func Test_AsyncTask(t *testing.T) {
-	ctx := context.Background()
-	task := asynctask.Start(
-		ctx, asynctask.ActionToFunc(
-			func(ctx context.Context) error {
-				for {
-					select {
-					case <-ctx.Done():
-						println("done")
-						return nil
-					default:
-						time.Sleep(1 * time.Second)
-						println(time.Now().UTC().String())
-					}
-				}
+func Test_Bot(t *testing.T) {
+	bot := Bot{
+		Name: "unit_test",
+		Setting: Setting{
+			Legs: []Leg{
+				{
+					Underlying: "SPX",
+					Action:     BUY,
+					Type:       CALL,
+					Quantity:   1,
+					Strike:     Strike{},
+				},
 			},
-		),
-	)
-	time.Sleep(5 * time.Second)
-	task.Cancel()
-	err := task.Wait(ctx)
-	println(err.Error())
-	time.Sleep(5 * time.Second)
+		},
+		EnableAutoOpen:  true,
+		EnableAutoClose: true,
+	}
+	println(bot)
 }

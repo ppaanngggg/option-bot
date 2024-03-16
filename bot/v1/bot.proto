@@ -1,0 +1,170 @@
+syntax = "proto3";
+
+package bot.v1;
+
+option go_package = "github.com/ppaanngggg/option-bot/gen/bot/v1;botv1";
+
+/*
+   Bot data types
+*/
+
+enum Action {
+  ACTION_UNSPECIFIED = 0;
+  ACTION_LONG = 1;
+  ACTION_SHORT = 2;
+}
+
+enum OptionType {
+  OPTION_TYPE_UNSPECIFIED = 0;
+  OPTION_TYPE_CALL = 1;
+  OPTION_TYPE_PUT = 2;
+}
+
+enum Match {
+  MATCH_UNSPECIFIED = 0;
+  // exact match
+  MATCH_EXACT = 1;
+  // nearest match
+  MATCH_NEAREST = 2;
+  // at least
+  MATCH_AT_LEAST = 3;
+  // at most
+  MATCH_AT_MOST = 4;
+}
+
+message DoubleRange {
+  double min = 1;
+  double max = 2;
+}
+
+message IntRange {
+  int32 min = 1;
+  int32 max = 2;
+}
+
+enum StrikeChooser {
+  STRIKE_CHOOSER_UNSPECIFIED = 0;
+  // use delta to choose strike
+  STRIKE_CHOOSER_DELTA = 1;
+  // use price to choose strike
+  STRIKE_CHOOSER_PRICE = 2;
+}
+
+message Strike {
+  // the strike chooser
+  StrikeChooser chooser = 1;
+
+  // match strategy
+  Match match = 10;
+  // the target delta
+  double delta = 11;
+  // limit the delta range
+  DoubleRange delta_range = 12;
+  // the target price
+  double price = 13;
+  // limit the price range
+  DoubleRange price_range = 14;
+
+  // offset to the strike chosen above, e.g +10, -10
+  double strike_offset = 21;
+}
+
+message DTE {
+  // match strategy
+  Match match = 10;
+  // the target DTE
+  int32 dte = 11;
+  // limit the DTE range
+  IntRange dte_range = 12;
+}
+
+message Leg {
+  // long or short
+  Action action = 1;
+  // call or put
+  OptionType option_type = 2;
+  // relative quantity, the final leg's quantity is position's size * this quantity
+  int32 quantity = 3;
+  // strike setting
+  Strike strike = 4;
+  // DTE setting
+  DTE dte = 5;
+}
+
+enum Allocator {
+  ALLOCATOR_UNSPECIFIED = 0;
+  // constant size
+  ALLOCATOR_CONSTANT = 1;
+  // max risk, the max loss if the worst case happens
+  ALLOCATOR_MAX_RISK = 2;
+}
+
+message Allocation {
+  Allocator allocator = 1;
+
+  // constant size
+  int32 constant_size = 11;
+  // max risk
+  double max_risk = 12;
+}
+
+message WeekdaysChooser {
+  bool monday = 1;
+  bool tuesday = 2;
+  bool wednesday = 3;
+  bool thursday = 4;
+  bool friday = 5;
+}
+
+message Time {
+  int32 hour = 1;
+  int32 minute = 2;
+}
+
+message Entry {
+  WeekdaysChooser weekdays = 1;
+  Time time = 2;
+}
+
+message Exit {
+  int32 dte = 1;
+  Time time = 2;
+  double stop_win = 11;
+  double stop_loss = 12;
+}
+
+message Setting {
+  // underlying symbol, e.g SPX, SPY
+  string underlying = 1;
+  // legs setting
+  repeated Leg legs = 2;
+  // allocation
+  Allocation allocation = 3;
+  // entry condition
+  Entry entry = 4;
+  // exit condition
+  Exit exit = 5;
+}
+
+message Bot {
+  string id = 1;
+  string name = 2;
+  Setting setting = 3;
+}
+
+/*
+   BotService
+*/
+
+message CreateRequest {
+  string name = 1;
+  Setting setting = 2;
+}
+
+message CreateResponse {
+  Bot bot = 1;
+}
+
+service BotService {
+  rpc Create(CreateRequest) returns (CreateResponse) {}
+}
