@@ -16,6 +16,15 @@ func TestTradier_Market(t *testing.T) {
 	tradier := newTradier()
 	ctx := context.Background()
 
+	tradePeriod, err := tradier.GetTodayTradePeriod(ctx)
+	assert.NoError(t, err)
+	t.Logf("today: %v", tradePeriod.Date)
+	if tradePeriod.IsOpen {
+		t.Logf("trading period: %v - %v", tradePeriod.OpenAt, tradePeriod.CloseAt)
+	} else {
+		t.Logf("market is closed")
+	}
+
 	symbols, err := tradier.Search(ctx, "SPX")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, symbols)

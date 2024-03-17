@@ -376,6 +376,77 @@ func (x *Symbol) GetType() SymbolType {
 	return SymbolType_SYMBOL_TYPE_UNSPECIFIED
 }
 
+type TradePeriod struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Date    string `protobuf:"bytes,1,opt,name=date,proto3" json:"date,omitempty"` // yyyy-mm-dd
+	IsOpen  bool   `protobuf:"varint,2,opt,name=is_open,json=isOpen,proto3" json:"is_open,omitempty"`
+	OpenAt  int64  `protobuf:"varint,3,opt,name=open_at,json=openAt,proto3" json:"open_at,omitempty"`    // unix timestamp in ms
+	CloseAt int64  `protobuf:"varint,4,opt,name=close_at,json=closeAt,proto3" json:"close_at,omitempty"` // unix timestamp in ms
+}
+
+func (x *TradePeriod) Reset() {
+	*x = TradePeriod{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_market_v1_market_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TradePeriod) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TradePeriod) ProtoMessage() {}
+
+func (x *TradePeriod) ProtoReflect() protoreflect.Message {
+	mi := &file_market_v1_market_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TradePeriod.ProtoReflect.Descriptor instead.
+func (*TradePeriod) Descriptor() ([]byte, []int) {
+	return file_market_v1_market_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TradePeriod) GetDate() string {
+	if x != nil {
+		return x.Date
+	}
+	return ""
+}
+
+func (x *TradePeriod) GetIsOpen() bool {
+	if x != nil {
+		return x.IsOpen
+	}
+	return false
+}
+
+func (x *TradePeriod) GetOpenAt() int64 {
+	if x != nil {
+		return x.OpenAt
+	}
+	return 0
+}
+
+func (x *TradePeriod) GetCloseAt() int64 {
+	if x != nil {
+		return x.CloseAt
+	}
+	return 0
+}
+
 var File_market_v1_market_proto protoreflect.FileDescriptor
 
 var file_market_v1_market_proto_rawDesc = []byte{
@@ -422,7 +493,14 @@ var file_market_v1_market_proto_rawDesc = []byte{
 	0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69,
 	0x6f, 0x6e, 0x12, 0x29, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0e,
 	0x32, 0x15, 0x2e, 0x6d, 0x61, 0x72, 0x6b, 0x65, 0x74, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x79, 0x6d,
-	0x62, 0x6f, 0x6c, 0x54, 0x79, 0x70, 0x65, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x2a, 0x84, 0x01,
+	0x62, 0x6f, 0x6c, 0x54, 0x79, 0x70, 0x65, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x22, 0x6e, 0x0a,
+	0x0b, 0x54, 0x72, 0x61, 0x64, 0x65, 0x50, 0x65, 0x72, 0x69, 0x6f, 0x64, 0x12, 0x12, 0x0a, 0x04,
+	0x64, 0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x64, 0x61, 0x74, 0x65,
+	0x12, 0x17, 0x0a, 0x07, 0x69, 0x73, 0x5f, 0x6f, 0x70, 0x65, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x08, 0x52, 0x06, 0x69, 0x73, 0x4f, 0x70, 0x65, 0x6e, 0x12, 0x17, 0x0a, 0x07, 0x6f, 0x70, 0x65,
+	0x6e, 0x5f, 0x61, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x6f, 0x70, 0x65, 0x6e,
+	0x41, 0x74, 0x12, 0x19, 0x0a, 0x08, 0x63, 0x6c, 0x6f, 0x73, 0x65, 0x5f, 0x61, 0x74, 0x18, 0x04,
+	0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x63, 0x6c, 0x6f, 0x73, 0x65, 0x41, 0x74, 0x2a, 0x84, 0x01,
 	0x0a, 0x0a, 0x53, 0x79, 0x6d, 0x62, 0x6f, 0x6c, 0x54, 0x79, 0x70, 0x65, 0x12, 0x1b, 0x0a, 0x17,
 	0x53, 0x59, 0x4d, 0x42, 0x4f, 0x4c, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x55, 0x4e, 0x53, 0x50,
 	0x45, 0x43, 0x49, 0x46, 0x49, 0x45, 0x44, 0x10, 0x00, 0x12, 0x15, 0x0a, 0x11, 0x53, 0x59, 0x4d,
@@ -451,12 +529,13 @@ func file_market_v1_market_proto_rawDescGZIP() []byte {
 }
 
 var file_market_v1_market_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_market_v1_market_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_market_v1_market_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_market_v1_market_proto_goTypes = []interface{}{
-	(SymbolType)(0), // 0: market.v1.SymbolType
-	(*Option)(nil),  // 1: market.v1.Option
-	(*Chain)(nil),   // 2: market.v1.Chain
-	(*Symbol)(nil),  // 3: market.v1.Symbol
+	(SymbolType)(0),     // 0: market.v1.SymbolType
+	(*Option)(nil),      // 1: market.v1.Option
+	(*Chain)(nil),       // 2: market.v1.Chain
+	(*Symbol)(nil),      // 3: market.v1.Symbol
+	(*TradePeriod)(nil), // 4: market.v1.TradePeriod
 }
 var file_market_v1_market_proto_depIdxs = []int32{
 	1, // 0: market.v1.Chain.calls:type_name -> market.v1.Option
@@ -511,6 +590,18 @@ func file_market_v1_market_proto_init() {
 				return nil
 			}
 		}
+		file_market_v1_market_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*TradePeriod); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -518,7 +609,7 @@ func file_market_v1_market_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_market_v1_market_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

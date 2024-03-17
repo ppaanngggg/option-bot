@@ -19,7 +19,7 @@ type Market interface {
 		ctx context.Context, symbol string, expiration string,
 	) ([]*marketv1.Chain, error)
 	// GetTodayTradePeriod returns the trading period for today
-	GetTodayTradePeriod(ctx context.Context) ([]string, error)
+	GetTodayTradePeriod(ctx context.Context) (*marketv1.TradePeriod, error)
 }
 
 func SortByStrikePrice(c *marketv1.Chain) {

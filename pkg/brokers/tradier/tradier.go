@@ -48,8 +48,8 @@ func (t *Tradier) Search(ctx context.Context, query string) (
 				Exchange    string `json:"exchange"`
 				Type        string `json:"type"`
 				Description string `json:"description"`
-			}
-		}
+			} `json:"security"`
+		} `json:"securities"`
 	}{}
 	resp, err := t.client.R().
 		SetContext(ctx).
@@ -94,8 +94,32 @@ func (t *Tradier) Search(ctx context.Context, query string) (
 }
 
 // GetTodayTradePeriod refer to https://documentation.tradier.com/brokerage-api/markets/get-calendar
-func (t *Tradier) GetTodayTradePeriod(ctx context.Context) ([]string, error) {
+func (t *Tradier) GetTodayTradePeriod(ctx context.Context) (
+	*marketv1.TradePeriod, error,
+) {
 	body := &struct {
+		Calendar struct {
+			Month int `json:"month"`
+			Year  int `json:"year"`
+			Days  struct {
+				Day []struct {
+					Date      string `json:"date"`
+					Status    string `json:"status"` // open or closed
+					Premarket struct {
+						Start string `json:"start"`
+						End   string `json:"end"`
+					} `json:"premarket"`
+					Open struct {
+						Start string `json:"start"` // 09:30
+						End   string `json:"end"`   // 16:00
+					} `json:"open"`
+					Postmarket struct {
+						Start string `json:"start"`
+						End   string `json:"end"`
+					} `json:"postmarket"`
+				} `json:"day"`
+			} `json:"days"`
+		} `json:"calendar"`
 	}{}
 	resp, err := t.client.R().
 		SetContext(ctx).
@@ -112,7 +136,40 @@ func (t *Tradier) GetTodayTradePeriod(ctx context.Context) ([]string, error) {
 			resp.Status(), resp.String(),
 		)
 	}
-	return nil, nil
+	// get today's date in the format "YYYY-MM-DD" of New York timezone
+	today := time.Now().In(utils.TZNewYork).Format("2006-01-02")
+	// find today's trade period
+	for _, day := range body.Calendar.Days.Day {
+		if day.Date == today {
+			if day.Status == "open" {
+				startTime, err := time.ParseInLocation(
+					"2006-04-02 15:04:05", today+" "+day.Open.Start+":00",
+					utils.TZNewYork,
+				)
+				if err != nil {
+					return nil, xerrors.New(err.Error())
+				}
+				endTime, err := time.ParseInLocation(
+					"2006-04-02 15:04:05", today+" "+day.Open.End+":00",
+					utils.TZNewYork,
+				)
+				if err != nil {
+					return nil, xerrors.New(err.Error())
+				}
+				return &marketv1.TradePeriod{
+					Date:    day.Date,
+					IsOpen:  true,
+					OpenAt:  startTime.UnixMilli(),
+					CloseAt: endTime.UnixMilli(),
+				}, nil
+			} else {
+				return &marketv1.TradePeriod{
+					Date: day.Date,
+				}, nil
+			}
+		}
+	}
+	return nil, xerrors.Errorf("today's trade period not found, today: %s", today)
 }
 
 // GetOptionChains refer to https://documentation.tradier.com/brokerage-api/markets/get-options-chains
