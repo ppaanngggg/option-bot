@@ -7,9 +7,7 @@ import (
 
 	"cdr.dev/slog"
 	"github.com/go-resty/resty/v2"
-	"github.com/ppaanngggg/option-bot/pkg/market"
-	"github.com/ppaanngggg/option-bot/pkg/utils"
-	marketv1 "github.com/ppaanngggg/option-bot/proto/gen/market/v1"
+	datasourcev1 "github.com/ppaanngggg/option-bot/proto/gen/datasource/v1"
 	"golang.org/x/xerrors"
 )
 
@@ -18,7 +16,7 @@ func NewTradier(isLive bool, apiKey string) *Tradier {
 		isLive: isLive,
 		apiKey: apiKey,
 		client: resty.New(),
-		logger: utils.DefaultLogger.With(slog.F("broker", "tradier")),
+		logger: util.DefaultLogger.With(slog.F("broker", "tradier")),
 	}
 	if tradier.isLive {
 		tradier.client.SetBaseURL("https://api.tradier.com/v1/")
@@ -28,7 +26,7 @@ func NewTradier(isLive bool, apiKey string) *Tradier {
 	return tradier
 }
 
-var _ market.Market = (*Tradier)(nil)
+var _ account.Market = (*Tradier)(nil)
 
 type Tradier struct {
 	isLive bool
@@ -39,7 +37,7 @@ type Tradier struct {
 
 // Search refer to https://documentation.tradier.com/brokerage-api/markets/get-lookup
 func (t *Tradier) Search(ctx context.Context, query string) (
-	[]*marketv1.Symbol, error,
+	[]*datasourcev1.Symbol, error,
 ) {
 	body := &struct {
 		Securities struct {
@@ -71,22 +69,22 @@ func (t *Tradier) Search(ctx context.Context, query string) (
 			resp.Status(), resp.String(),
 		)
 	}
-	// Convert to marketv1.Symbol
-	symbols := make([]*marketv1.Symbol, 0, len(body.Securities.Security))
+	// Convert to datasourcev1.Symbol
+	symbols := make([]*datasourcev1.Symbol, 0, len(body.Securities.Security))
 	for _, sec := range body.Securities.Security {
-		symbol := &marketv1.Symbol{
+		symbol := &datasourcev1.Symbol{
 			Symbol:      sec.Symbol,
 			Description: sec.Description,
 		}
 		switch sec.Type {
 		case "stock":
-			symbol.Type = marketv1.SymbolType_SYMBOL_TYPE_STOCK
+			symbol.Type = datasourcev1.SymbolType_SYMBOL_TYPE_STOCK
 		case "option":
-			symbol.Type = marketv1.SymbolType_SYMBOL_TYPE_OPTION
+			symbol.Type = datasourcev1.SymbolType_SYMBOL_TYPE_OPTION
 		case "index":
-			symbol.Type = marketv1.SymbolType_SYMBOL_TYPE_INDEX
+			symbol.Type = datasourcev1.SymbolType_SYMBOL_TYPE_INDEX
 		case "etf":
-			symbol.Type = marketv1.SymbolType_SYMBOL_TYPE_ETF
+			symbol.Type = datasourcev1.SymbolType_SYMBOL_TYPE_ETF
 		}
 		symbols = append(symbols, symbol)
 	}
@@ -95,7 +93,7 @@ func (t *Tradier) Search(ctx context.Context, query string) (
 
 // GetTodayTradePeriod refer to https://documentation.tradier.com/brokerage-api/markets/get-calendar
 func (t *Tradier) GetTodayTradePeriod(ctx context.Context) (
-	*marketv1.TradePeriod, error,
+	*datasourcev1.TradePeriod, error,
 ) {
 	body := &struct {
 		Calendar struct {
@@ -137,33 +135,33 @@ func (t *Tradier) GetTodayTradePeriod(ctx context.Context) (
 		)
 	}
 	// get today's date in the format "YYYY-MM-DD" of New York timezone
-	today := time.Now().In(utils.TZNewYork).Format("2006-01-02")
+	today := time.Now().In(util.TZNewYork).Format("2006-01-02")
 	// find today's trade period
 	for _, day := range body.Calendar.Days.Day {
 		if day.Date == today {
 			if day.Status == "open" {
 				startTime, err := time.ParseInLocation(
 					"2006-04-02 15:04:05", today+" "+day.Open.Start+":00",
-					utils.TZNewYork,
+					util.TZNewYork,
 				)
 				if err != nil {
 					return nil, xerrors.New(err.Error())
 				}
 				endTime, err := time.ParseInLocation(
 					"2006-04-02 15:04:05", today+" "+day.Open.End+":00",
-					utils.TZNewYork,
+					util.TZNewYork,
 				)
 				if err != nil {
 					return nil, xerrors.New(err.Error())
 				}
-				return &marketv1.TradePeriod{
+				return &datasourcev1.TradePeriod{
 					Date:    day.Date,
 					IsOpen:  true,
 					OpenAt:  startTime.UnixMilli(),
 					CloseAt: endTime.UnixMilli(),
 				}, nil
 			} else {
-				return &marketv1.TradePeriod{
+				return &datasourcev1.TradePeriod{
 					Date: day.Date,
 				}, nil
 			}
@@ -174,8 +172,8 @@ func (t *Tradier) GetTodayTradePeriod(ctx context.Context) (
 
 // GetOptionChains refer to https://documentation.tradier.com/brokerage-api/markets/get-options-chains
 func (t *Tradier) GetOptionChains(
-	ctx context.Context, symbol string, expiration string,
-) ([]*marketv1.Chain, error) {
+	ctx context.Context, underlying string, expiration string,
+) ([]*datasourcev1.Chain, error) {
 	body := &struct {
 		Options struct {
 			Option []struct {
@@ -211,7 +209,7 @@ func (t *Tradier) GetOptionChains(
 		SetHeader("Accept", "application/json").
 		SetQueryParams(
 			map[string]string{
-				"symbol":     symbol,
+				"symbol":     underlying,
 				"expiration": expiration,
 				"greeks":     "true",
 			},
@@ -228,19 +226,19 @@ func (t *Tradier) GetOptionChains(
 		)
 	}
 	// Group options to chain by root_symbol
-	chains := make(map[string]*marketv1.Chain)
+	chains := make(map[string]*datasourcev1.Chain)
 	for _, opt := range body.Options.Option {
 		// e.g. SPXW or SPX for underlying SPX
 		chain, ok := chains[opt.RootSymbol]
 		if !ok {
-			chain = &marketv1.Chain{
+			chain = &datasourcev1.Chain{
 				RootSymbol: opt.RootSymbol,
 				Underlying: opt.Underlying,
 				Expiration: opt.ExpirationDate,
 			}
 		}
 		// Append option to chain
-		option := &marketv1.Option{
+		option := &datasourcev1.Option{
 			Symbol:  opt.Symbol,
 			Strike:  opt.Strike,
 			Bid:     opt.Bid,
@@ -258,7 +256,7 @@ func (t *Tradier) GetOptionChains(
 		}
 		// parse greeks updated at to unix milli
 		greeksUpdateAt, err := time.ParseInLocation(
-			"2006-01-02 15:04:05", opt.Greeks.UpdatedAt, utils.TZNewYork,
+			"2006-01-02 15:04:05", opt.Greeks.UpdatedAt, util.TZNewYork,
 		)
 		if err != nil {
 			return nil, xerrors.New(err.Error())
@@ -272,9 +270,9 @@ func (t *Tradier) GetOptionChains(
 		chains[opt.RootSymbol] = chain
 	}
 	// Sort calls and puts by strike price, and return
-	rets := make([]*marketv1.Chain, 0, len(chains))
+	rets := make([]*datasourcev1.Chain, 0, len(chains))
 	for _, chain := range chains {
-		market.SortByStrikePrice(chain)
+		account.SortByStrikePrice(chain)
 		rets = append(rets, chain)
 	}
 	return rets, nil
@@ -282,7 +280,7 @@ func (t *Tradier) GetOptionChains(
 
 // GetOptionExpirations refer to https://documentation.tradier.com/brokerage-api/markets/get-options-expirations
 func (t *Tradier) GetOptionExpirations(
-	ctx context.Context, symbol string,
+	ctx context.Context, underlying string,
 ) ([]string, error) {
 	body := &struct {
 		Expirations struct {
@@ -295,7 +293,7 @@ func (t *Tradier) GetOptionExpirations(
 		SetHeader("Accept", "application/json").
 		SetQueryParams(
 			map[string]string{
-				"symbol":          symbol,
+				"symbol":          underlying,
 				"includeAllRoots": "true", // to deal with VIX/VIXW, SPX/SPXW, NDX/NDXP, RUT/RUTW
 			},
 		).

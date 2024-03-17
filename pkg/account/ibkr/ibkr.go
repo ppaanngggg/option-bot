@@ -5,7 +5,6 @@ import (
 
 	"cdr.dev/slog"
 	"github.com/go-resty/resty/v2"
-	"github.com/ppaanngggg/option-bot/pkg/utils"
 	"golang.org/x/xerrors"
 )
 
@@ -19,7 +18,7 @@ func NewIBKR(host string) *IBKR {
 	ibkr := &IBKR{
 		host:   host,
 		client: resty.New(),
-		logger: utils.DefaultLogger.With(slog.F("broker", "ibkr")),
+		logger: util.DefaultLogger.With(slog.F("broker", "ibkr")),
 	}
 	ibkr.client.SetBaseURL(ibkr.host)
 	return ibkr

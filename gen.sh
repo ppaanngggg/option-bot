@@ -3,7 +3,9 @@
 # 1. func to buf lint and buf generate
 gen_buf() {
   cd ./proto || exit
+  buf format -w
   buf lint
+  rm -rf ./gen
   buf generate
   cd ..
 }

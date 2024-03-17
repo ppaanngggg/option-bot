@@ -3,3 +3,63 @@ syntax = "proto3";
 package account.v1;
 
 option go_package = "github.com/ppaanngggg/option-bot/proto/gen/account/v1;accountv1";
+
+enum AccountType {
+  ACCOUNT_TYPE_UNSPECIFIED = 0;
+  ACCOUNT_TYPE_TRADIER = 1;
+}
+
+message Setting {
+  AccountType type = 1;
+  message Tradier {
+    bool is_live = 1;
+    string api_key = 2;
+  }
+  Tradier tradier = 2;
+}
+
+/*
+   AccountService
+*/
+
+message CreateRequest {
+  string name = 1;
+  Setting setting = 2;
+}
+
+message CreateResponse {
+  string id = 1;
+  string name = 2;
+  int64 created_at = 3;
+  Setting setting = 4;
+}
+
+message GetRequest {
+  string id = 1;
+}
+
+message GetResponse {
+  string id = 1;
+  string name = 2;
+  int64 created_at = 3;
+  Setting setting = 4;
+}
+
+message ListRequest {}
+
+message ListResponse {
+  repeated GetResponse list = 1;
+}
+
+message DeleteRequest {
+  string id = 1;
+}
+
+message DeleteResponse {}
+
+service AccountService {
+  rpc Create(CreateRequest) returns (CreateResponse);
+  rpc Get(GetRequest) returns (GetResponse);
+  rpc List(ListRequest) returns (ListResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+}

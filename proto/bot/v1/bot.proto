@@ -146,12 +146,6 @@ message Setting {
   Exit exit = 5;
 }
 
-message Bot {
-  string id = 1;
-  string name = 2;
-  Setting setting = 3;
-}
-
 /*
    BotService
 */
@@ -162,7 +156,9 @@ message CreateRequest {
 }
 
 message CreateResponse {
-  Bot bot = 1;
+  string id = 1;
+  string name = 2;
+  Setting setting = 3;
 }
 
 message GetRequest {
@@ -170,7 +166,9 @@ message GetRequest {
 }
 
 message GetResponse {
-  Bot bot = 1;
+  string id = 1;
+  string name = 2;
+  Setting setting = 3;
 }
 
 service BotService {
